@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::title}, ~{::section}, ~{::aside})}">
+<head>
+    <title th:text="${movie != null} ? ${movie.title} + ' – Actlas' : 'Actlas'">Фільм – Actlas</title>
+</head>
+<body>
+
+<section>
+    <a href="/" class="back-link">&#8592; Повернутись</a>
+
+    <th:block th:if="${movie == null}">
+        <div class="empty-state">
+            <div class="empty-state__line"></div>
+            <div class="empty-state__text">
+                Фільм не знайдено<br>
+                <a href="/" style="color:var(--accent);margin-top:12px;display:inline-block;">
+                    &#8592; На головну
+                </a>
+            </div>
+        </div>
+    </th:block>
+
+    <th:block th:if="${movie != null}">
+
+        <div class="movie-hero">
+            <div>
+                <img th:if="${movie.imageUrl}"
+                     class="movie-hero__poster"
+                     th:src="${movie.imageUrl}"
+                     th:alt="${movie.title}">
+                <div th:unless="${movie.imageUrl}" class="movie-hero__poster-placeholder"></div>
+            </div>
+
+            <div>
+                <h1 class="movie-hero__title" th:text="${movie.title}">Назва</h1>
+
+                <p th:if="${movie.originalTitle != null and movie.originalTitle != movie.title}"
+                   class="movie-hero__original"
+                   th:text="${movie.originalTitle}">
+                </p>
+
+                <div class="movie-hero__badges">
+                    <span th:if="${movie.year}" class="badge" th:text="${movie.year}">2024</span>
+                    <span th:if="${movie.rating}" class="badge badge--rating"
+                          th:text="|&#9733; ${#numbers.formatDecimal(movie.rating, 1, 1)}|">
+                    </span>
+                    <span th:if="${movie.actors != null and !movie.actors.isEmpty()}"
+                          class="badge"
+                          th:text="${movie.actors.size()} + ' акторів'">
+                    </span>
+                </div>
+
+                <!-- Опис фільму -->
+                <th:block th:if="${movie.plotUkr != null or movie.plot != null}">
+                    <div class="movie-plot">
+                        <!-- Таби тільки якщо є обидва -->
+                        <div th:if="${movie.plotUkr != null and movie.plot != null}"
+                             class="plot-tabs">
+                            <button class="plot-tab active" onclick="switchPlot('ukr')">
+                                Українська
+                            </button>
+                            <button class="plot-tab" onclick="switchPlot('en')">
+                                English
+                            </button>
+                        </div>
+                        <!-- Лейбл якщо тільки один -->
+                        <div th:if="${movie.plotUkr == null and movie.plot != null}"
+                             class="plot-label">Plot</div>
+
+                        <p th:if="${movie.plotUkr != null}"
+                           class="plot-text" id="plot-ukr"
+                           th:text="${movie.plotUkr}"></p>
+
+                        <p th:if="${movie.plot != null and movie.plotUkr == null}"
+                           class="plot-text"
+                           th:text="${movie.plot}"></p>
+
+                        <p th:if="${movie.plot != null and movie.plotUkr != null}"
+                           class="plot-text" id="plot-en"
+                           style="display:none"
+                           th:text="${movie.plot}"></p>
+                    </div>
+                </th:block>
+
+                <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap;">
+                    <a th:href="|https://www.imdb.com/title/${movie.imdbId}|"
+                       target="_blank" class="btn btn--ghost">
+                        IMDB &#8599;
+                    </a>
+                    <button class="btn btn--danger" id="delete-movie-btn"
+                            th:data-imdb-id="${movie.imdbId}">
+                        Видалити з історії
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Актори -->
+        <div class="section">
+            <div class="section__header">
+                <h2 class="section__title">АКТОРИ</h2>
+                <span class="section__count"
+                      th:text="${movie.actors != null} ? ${movie.actors.size()} + ' осіб' : ''">
+                </span>
+            </div>
+
+            <div th:if="${movie.actors != null and !movie.actors.isEmpty()}"
+                 class="grid grid--actors" id="actors-grid">
+                <div th:each="actor : ${movie.actors}" class="actor-card">
+                    <img th:if="${actor.imageUrl}"
+                         class="actor-card__photo"
+                         th:src="${actor.imageUrl}"
+                         th:alt="${actor.displayName}"
+                         loading="lazy">
+                    <div th:unless="${actor.imageUrl}" class="actor-card__photo-placeholder"></div>
+                    <div class="actor-card__body">
+                        <div class="actor-card__name" th:text="${actor.displayName}">Ім'я</div>
+                        <div th:if="${actor.birthDate}"
+                             class="actor-card__birth"
+                             th:text="${actor.birthDate}">
+                        </div>
+                        <!-- Превью біографії якщо вже є -->
+                        <div th:if="${actor.biography != null}"
+                             class="actor-card__bio-preview"
+                             th:text="${#strings.abbreviate(actor.biography, 72)}">
+                        </div>
+                        <div class="actor-card__actions">
+                            <button class="actor-card__pin"
+                                    th:data-actor-id="${actor.id}"
+                                    th:data-actor-name="${actor.displayName}"
+                                    th:data-actor-image="${actor.imageUrl} ?: ''">
+                                Закріпити
+                            </button>
+                            <button class="actor-card__films"
+                                    th:data-actor-id="${actor.id}"
+                                    th:data-actor-name="${actor.displayName}">
+                                Фільми
+                            </button>
+                            <!-- Кнопка біографії – завжди є, підвантажує динамічно -->
+                            <button class="actor-card__bio-btn"
+                                    th:data-actor-id="${actor.id}"
+                                    th:data-actor-name="${actor.displayName}"
+                                    th:data-bio="${actor.biography}">
+                                Біографія
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${movie.actors == null or movie.actors.isEmpty()}" class="empty-state">
+                <div class="empty-state__line"></div>
+                <div class="empty-state__text">Інформація про акторів відсутня</div>
+            </div>
+        </div>
+
+    </th:block>
+
+    <!-- Модалка: фільми актора -->
+    <div id="actor-movies-modal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+            <div class="modal__header">
+                <h3 class="modal__title" id="modal-actor-name">Фільми актора</h3>
+                <button class="modal__close" id="modal-close-films">&#x2715;</button>
+            </div>
+            <div class="modal__body" id="modal-films-body"></div>
+        </div>
+    </div>
+
+    <!-- Модалка: біографія -->
+    <div id="actor-bio-modal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+            <div class="modal__header">
+                <h3 class="modal__title" id="modal-bio-name">Біографія</h3>
+                <button class="modal__close" id="modal-close-bio">&#x2715;</button>
+            </div>
+            <div class="modal__body" id="modal-bio-body"></div>
+        </div>
+    </div>
+
+    <!-- Pinned bar -->
+    <div class="pinned-bar" id="pinned-bar">
+        <div class="pinned-bar__actors" id="pinned-actors"></div>
+        <button class="pinned-bar__btn" id="find-common-btn">Знайти спільні фільми</button>
+        <button class="pinned-bar__clear" id="clear-pinned-btn" title="Очистити">&#x2715;</button>
+    </div>
+</section>
+
+<aside th:fragment="pageScripts">
+    <script>
+        // Перемикач мови опису фільму
+        function switchPlot(lang) {
+            const ukr    = document.getElementById('plot-ukr');
+            const en     = document.getElementById('plot-en');
+            const tabs   = document.querySelectorAll('.plot-tab');
+            if (!ukr || !en) return;
+            ukr.style.display = lang === 'ukr' ? 'block' : 'none';
+            en.style.display  = lang === 'en'  ? 'block' : 'none';
+            tabs.forEach((t, i) => t.classList.toggle('active', i === (lang === 'ukr' ? 0 : 1)));
+        }
+
+        // Видалити фільм
+        const deleteBtn = document.getElementById('delete-movie-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async function() {
+                if (!confirm('Видалити фільм з історії?')) return;
+                try {
+                    await MovieAPI.delete(this.dataset.imdbId);
+                    Toast.success('Видалено');
+                    setTimeout(() => window.location.href = '/', 1200);
+                } catch (e) {
+                    Toast.error('Помилка видалення');
+                }
+            });
+        }
+
+        // Делегування кліків по акторах
+        const actorsGrid = document.getElementById('actors-grid');
+        if (actorsGrid) {
+            actorsGrid.addEventListener('click', async function(e) {
+
+                const filmsBtn = e.target.closest('.actor-card__films');
+                if (filmsBtn) {
+                    await openActorFilms(
+                        filmsBtn.dataset.actorId,
+                        filmsBtn.dataset.actorName
+                    );
+                    return;
+                }
+
+                const bioBtn = e.target.closest('.actor-card__bio-btn');
+                if (bioBtn) {
+                    await openBioModal(
+                        bioBtn.dataset.actorId,
+                        bioBtn.dataset.actorName,
+                        bioBtn.dataset.bio || null
+                    );
+                }
+            });
+        }
+
+
+        async function openActorFilms(actorId, actorName) {
+            const modal = document.getElementById('actor-movies-modal');
+            const body  = document.getElementById('modal-films-body');
+            document.getElementById('modal-actor-name').textContent = actorName;
+            body.innerHTML =
+                '<div class="loading-state"><div class="search-spinner"></div>Завантаження...</div>';
+            modal.style.display = 'flex';
+
+            try {
+                const movies = await ActorAPI.getMovies(actorId);
+                if (!movies || movies.length === 0) {
+                    body.innerHTML =
+                        '<div class="empty-state"><div class="empty-state__line"></div>' +
+                        '<div class="empty-state__text">Фільмів у базі не знайдено.<br>' +
+                        'Переглянь більше фільмів з цим актором.</div></div>';
+                    return;
+                }
+                body.innerHTML =
+                    '<div class="grid grid--movies">' +
+                    movies.map(m =>
+                        '<div class="movie-card" style="cursor:pointer" ' +
+                        'onclick="window.location.href=\'/movies/' + m.imdbId + '\'">' +
+                        (m.imageUrl
+                            ? '<img class="movie-card__poster" src="' + m.imageUrl + '" loading="lazy">'
+                            : '<div class="movie-card__poster-placeholder"></div>') +
+                        '<div class="movie-card__body">' +
+                        '<div class="movie-card__title">' + m.title + '</div>' +
+                        '<div class="movie-card__meta"><span>' + (m.year || '–') + '</span>' +
+                        (m.rating
+                            ? '<span class="movie-card__rating">&#9733; ' + m.rating.toFixed(1) + '</span>'
+                            : '') +
+                        '</div></div></div>'
+                    ).join('') + '</div>';
+            } catch (err) {
+                body.innerHTML =
+                    '<div class="empty-state"><div class="empty-state__text">Помилка завантаження</div></div>';
+            }
+        }
+
+
+        async function openBioModal(actorId, actorName, bio) {
+            const modal = document.getElementById('actor-bio-modal');
+            const body  = document.getElementById('modal-bio-body');
+            document.getElementById('modal-bio-name').textContent = actorName;
+            modal.style.display = 'flex';
+
+            if (bio && bio.trim().length > 0) {
+                renderBio(body, bio);
+                return;
+            }
+
+            body.innerHTML =
+                '<div class="loading-state"><div class="search-spinner"></div>Завантаження...</div>';
+
+            try {
+                const actor = await ActorAPI.get(actorId);
+                if (actor && actor.biography) {
+                    renderBio(body, actor.biography);
+
+
+                    const btn = document.querySelector(
+                        '.actor-card__bio-btn[data-actor-id="' + actorId + '"]'
+                    );
+                    if (btn) btn.dataset.bio = actor.biography;
+                } else {
+                    body.innerHTML =
+                        '<div class="empty-state"><div class="empty-state__line"></div>' +
+                        '<div class="empty-state__text">Біографія не знайдена</div></div>';
+                }
+            } catch (err) {
+                body.innerHTML =
+                    '<div class="empty-state"><div class="empty-state__text">Помилка завантаження</div></div>';
+            }
+        }
+
+        function renderBio(container, bio) {
+            container.innerHTML =
+                '<div class="bio-text">' +
+                bio.split('\n\n')
+                    .filter(p => p.trim().length > 0)
+                    .map(p => '<p>' + p + '</p>')
+                    .join('') +
+                '</div>';
+        }
+
+
+        document.getElementById('modal-close-films').addEventListener('click', function() {
+            document.getElementById('actor-movies-modal').style.display = 'none';
+        });
+        document.getElementById('modal-close-bio').addEventListener('click', function() {
+            document.getElementById('actor-bio-modal').style.display = 'none';
+        });
+        document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === this) this.style.display = 'none';
+            });
+        });
+    </script>
+</aside>
+
+</body>
+</html>
