@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::title}, ~{::section}, ~{::aside})}">
+<head>
+    <title>Actlas – Пошук акторів</title>
+</head>
+<body>
+
+<!-- CONTENT -->
+<section>
+    <h1 class="page-title">ЗНАЙДИ АКТОРА</h1>
+    <p class="page-subtitle">Пошук за фільмом – дізнайся хто знімався</p>
+
+    <!-- Search -->
+    <div class="search-wrap" style="margin-bottom: 60px;">
+        <input
+                type="text"
+                id="search-input"
+                class="search-input"
+                placeholder="Назва фільму... (Spider-Man, Люди Х)"
+                autocomplete="off"
+        >
+        <span class="search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+</svg>
+        </span>
+        <div id="search-dropdown" class="search-dropdown"></div>
+    </div>
+
+    <!-- History -->
+    <div class="section">
+        <div class="section__header">
+            <h2 class="section__title">ІСТОРІЯ</h2>
+            <span class="section__count" id="history-count"
+                  th:text="${history != null and !history.isEmpty()} ? ${history.size()} + ' фільмів' : ''">
+            </span>
+        </div>
+
+        <div id="history-grid" class="grid grid--movies">
+            <th:block th:if="${history != null and !history.isEmpty()}">
+                <div th:each="movie : ${history}"
+                     class="movie-card"
+                     th:data-imdb-id="${movie.imdbId}">
+                    <button class="movie-card__delete"
+                            th:data-imdb-id="${movie.imdbId}">&#x2715;</button>
+                    <img th:if="${movie.imageUrl}"
+                         class="movie-card__poster"
+                         th:src="${movie.imageUrl}"
+                         th:alt="${movie.title}"
+                         loading="lazy">
+                    <div th:unless="${movie.imageUrl}" class="movie-card__poster-placeholder"></div>
+                    <div class="movie-card__body">
+                        <div class="movie-card__title" th:text="${movie.title}">Назва</div>
+                        <div class="movie-card__meta">
+                            <span th:text="${movie.year} ?: '–'">2024</span>
+                            <span th:if="${movie.rating}"
+                                  class="movie-card__rating"
+                                  th:text="|&#9733; ${#numbers.formatDecimal(movie.rating, 1, 1)}|">
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </th:block>
+
+            <th:block th:if="${history == null or history.isEmpty()}">
+                <div class="empty-state" style="grid-column: 1/-1;">
+                    <div class="empty-state__line"></div>
+                    <div class="empty-state__text">
+                        Ще нічого не переглядали<br>
+                        Знайди фільм вище і натисни на нього
+                    </div>
+                </div>
+            </th:block>
+        </div>
+    </div>
+
+    <!-- Pinned bar -->
+    <div class="pinned-bar" id="pinned-bar">
+        <div class="pinned-bar__actors" id="pinned-actors"></div>
+        <button class="pinned-bar__btn" id="find-common-btn">Знайти спільні фільми</button>
+        <button class="pinned-bar__clear" id="clear-pinned-btn" title="Очистити">&#x2715;</button>
+    </div>
+</section>
+
+
+<aside th:fragment="pageScripts">
+    <script>
+        Search.init('search-input', 'search-dropdown');
+
+        Search.onSelect = async function(movie) {
+            document.getElementById('search-dropdown').classList.remove('active');
+            document.getElementById('search-input').value = movie.title;
+            Toast.info('Завантаження "' + movie.title + '"...');
+            try {
+                const saved = await MovieAPI.fetch(movie.imdbId);
+                Toast.success('"' + saved.title + '" збережено!');
+                window.location.href = '/movies/' + movie.imdbId;
+            } catch (e) {
+                Toast.error('Не вдалось завантажити фільм');
+            }
+        };
+
+        document.getElementById('history-grid').addEventListener('click', async function(e) {
+            const deleteBtn = e.target.closest('.movie-card__delete');
+            if (deleteBtn) {
+                e.stopPropagation();
+                await deleteFromHistory(deleteBtn.dataset.imdbId);
+                return;
+            }
+            const card = e.target.closest('.movie-card');
+            if (card) {
+                window.location.href = '/movies/' + card.dataset.imdbId;
+            }
+        });
+
+        async function deleteFromHistory(imdbId) {
+            try {
+                await MovieAPI.delete(imdbId);
+                const card = document.querySelector('.movie-card[data-imdb-id="' + imdbId + '"]');
+                if (card) card.remove();
+                Toast.success('Видалено з історії');
+
+                const remaining = document.querySelectorAll('#history-grid .movie-card').length;
+                const counter = document.getElementById('history-count');
+                if (counter) counter.textContent = remaining > 0 ? remaining + ' фільмів' : '';
+
+                if (remaining === 0) {
+                    document.getElementById('history-grid').innerHTML =
+                        '<div class="empty-state" style="grid-column:1/-1">' +
+                        '<div class="empty-state__line"></div>' +
+                        '<div class="empty-state__text">Ще нічого не переглядали</div>' +
+                        '</div>';
+                }
+            } catch (e) {
+                Toast.error('Помилка видалення');
+            }
+        }
+    </script>
+</aside>
+
+</body>
+</html>
